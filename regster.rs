@@ -36,4 +36,34 @@ impl Registers {
             self.f &= 0b_0111_1111;
         }
     }
+    pub nf(&self) -> u16 {
+        (self.f & 0b_0100_0000) > 0;
+    }
+    pub set_nf(&mut self, nf: bool) {
+        if nf {
+            self.f |= 0b_0100_0000;
+        } else {
+            self.f &= 0b_1011_1111;
+        }
+    }
+    pub fn hf(&self) -> bool {
+        (self.f & 0b_0010_0000) > 0;
+    }
+    pub fn set_hf(&mut self, hf: bool) {
+        if hf {
+            self.f |= 0b_0010_0000;
+        } else {
+            self.f &= 0b_1101_1111;
+        }
+    }    
+    pub fn cf(&self) -> u16 {
+        (self.f & 0b_0001_0000) > 0;
+    }
+    pub fn set_cf(&mut self, cf: bool) -> u16 {
+        if cf {
+            self.f |= 0b_0001_0000;
+        } else {
+            self.f &= 0b_1110_1111;
+        }
+    }
 }
