@@ -1,8 +1,4 @@
-use std::sync::atomic::{
-    AtomicU8,
-    AtomicU16,
-    Ordering::Relaxed,
-};
+use std::sync::atomic::{AtomicU16, AtomicU8, Ordering::Relaxed};
 
 pub trait IO8<T: Copy> {
     fn read8(&mut self, bus: &Peripherals, src: T) -> Option<u8>;
@@ -14,21 +10,50 @@ pub trait IO16<T: Copy> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum Reg8 { A, B, C, D, E, H, L }
+pub enum Reg8 {
+    A,
+    B,
+    C,
+    D,
+    E,
+    H,
+    L,
+}
 #[derive(Clone, Copy, Debug)]
-pub enum Reg16 { AF, BC, DE, HL, SP }
+pub enum Reg16 {
+    AF,
+    BC,
+    DE,
+    HL,
+    SP,
+}
 #[derive(Clone, Copy, Debug)]
 pub struct Imm8;
 #[derive(Clone, Copy, Debug)]
 pub struct Imm16;
 #[derive(Clone, Copy, Debug)]
-pub enum Indirect { BC, DE, HL, CFF, HLD, HLI }
+pub enum Indirect {
+    BC,
+    DE,
+    HL,
+    CFF,
+    HLD,
+    HLI,
+}
 #[derive(Clone, Copy, Debug)]
-pub enum Direct8 { D, DFF }
+pub enum Direct8 {
+    D,
+    DFF,
+}
 #[derive(Clone, Copy, Debug)]
 pub struct Direct16;
 #[derive(Clone, Copy, Debug)]
-pub enum Cond { NZ, Z, NC, C }
+pub enum Cond {
+    NZ,
+    Z,
+    NC,
+    C,
+}
 
 impl IO8<Reg8> for Cpu {
     fn read8(&mut self, _: &Peripherals, src: Reg8) -> Option<u8> {
@@ -64,14 +89,13 @@ impl IO16<Reg16> for Cpu {
             Reg16::SP => self.regs.sp,
         })
     }
-    fn write16(&mut self, _:&mut Peripherals, dst: Reg16, val: u16) -> Option<()> {
+    fn write16(&mut self, _: &mut Peripherals, dst: Reg16, val: u16) -> Option<()> {
         Some(match dst {
             Reg16::AF => self.regs.write_af(val),
             Reg16::BC => self.regs.write_bc(val),
             Reg16::DE => self.regs.write_de(val),
             Reg16::HL => self.regs.write_hl(val),
             Reg16::SP => self.regs.sp = val,
-
         })
     }
 }
@@ -110,7 +134,7 @@ impl IO16<Imm16> for Cpu {
                 return Some(VAL16.load(Relaxed));
             },
         });
-        fn write16(&mut self, _: &mut Peripherals, _: Imm16, _:u16) -> Option<()> {
+        fn write16(&mut self, _: &mut Peripherals, _: Imm16, _: u16) -> Option<()> {
             unreachable!();
         }
     }
@@ -138,5 +162,32 @@ impl IO8<Indirect> for Cpu {
                 return Some(VAL8.load(Relaxed));
             },
         });
+    }
+    fn write8(&mut self, bus: &mut Peripherals, dst: Indirect, val: u8) -> Option<()> {
+        step!(None, {
+            0: {
+                match dst {
+                    Indirect::BC => bus.write8(self.regs.bc(), val),
+                    Indirect::DE => bus.write8(self.regs.de(), val),
+                    Indirect::HL => bus.write8(self.regs.hl(), val),
+                    Indirect::CFF => bus.write(0xFF00 | (self.regs.c as u16), val),
+                    Indirect::HLD => {
+                        let addr = self.regs.hl();
+                        self.regs.write_hl(addr.wrapping_sub(1));
+                        bus.write(addr, val);
+                    },
+                    Indirect::HLI => {
+                        let addr = self.regs.hl();
+                        self.regs.write_hl(addr.wrapping_add(1));
+                        bus.write(addr, val);
+                    },
+                    go!(1);
+                    return None;
+                }
+            },
+            1: {
+                return Some(go!(0));
+            }
+        })
     }
 }
