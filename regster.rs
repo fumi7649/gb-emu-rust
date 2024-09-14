@@ -36,10 +36,10 @@ impl Registers {
             self.f &= 0b_0111_1111;
         }
     }
-    pub nf(&self) -> u16 {
+    pub fn  nf(&self) -> u16 {
         (self.f & 0b_0100_0000) > 0;
     }
-    pub set_nf(&mut self, nf: bool) {
+    pub fn  set_nf(&mut self, nf: bool) {
         if nf {
             self.f |= 0b_0100_0000;
         } else {
