@@ -19,12 +19,4 @@ impl Cpu {
             _    => panic!("Not implemented: {:02x}", self.opcode)
         }
     }
-    // 何もしないという命令
-    // fetch/execute overlapにしたがい次の命令をfetchする
-    pub fn nop(&mut self, bus: &Peripherals) {
-        self.fetch(bus);
-    }
-    pub fn emulate_cycle(&mut self, bus: &mut Peripherals) {
-        self.decode(bus);
-    }
 }
