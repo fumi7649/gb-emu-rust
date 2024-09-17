@@ -36,8 +36,8 @@ impl Registers {
             self.f &= 0b_0111_1111;
         }
     }
-    pub fn  nf(&self) -> u16 {
-        (self.f & 0b_0100_0000) > 0;
+    pub fn  nf(&self) -> bool {
+        (self.f & 0b_0100_0000) > 0
     }
     pub fn  set_nf(&mut self, nf: bool) {
         if nf {
@@ -47,7 +47,7 @@ impl Registers {
         }
     }
     pub fn hf(&self) -> bool {
-        (self.f & 0b_0010_0000) > 0;
+        (self.f & 0b_0010_0000) > 0
     }
     pub fn set_hf(&mut self, hf: bool) {
         if hf {
@@ -56,14 +56,30 @@ impl Registers {
             self.f &= 0b_1101_1111;
         }
     }    
-    pub fn cf(&self) -> u16 {
-        (self.f & 0b_0001_0000) > 0;
+    pub fn cf(&self) -> bool {
+        (self.f & 0b_0001_0000) > 0
     }
-    pub fn set_cf(&mut self, cf: bool) -> u16 {
+    pub fn set_cf(&mut self, cf: bool) {
         if cf {
             self.f |= 0b_0001_0000;
         } else {
             self.f &= 0b_1110_1111;
         }
+    }
+    pub fn write_af(&mut self, val: u16) {
+        self.a = (val >> 8) as u8;
+        self.f = (val & 0xF0) as u8; // F0は二進数で1111 0000 Fレジスタは下位4bitは常に0
+    }
+    pub fn write_bc(&mut self, val: u16) {
+        self.b = (val >> 8) as u8;
+        self.c = val as u8;
+    }
+    pub fn write_de(&mut self, val: u16) {
+        self.d = (val >> 8) as u8;
+        self.e = val as u8;
+    }
+    pub fn write_hl(&mut self, val: u16) {
+        self.h = (val >> 8) as u8;
+        self.l = val as u8;
     }
 }
