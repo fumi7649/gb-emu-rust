@@ -1,21 +1,15 @@
-macro_rules! step {
-    ($d: expr, {$($c:tt :$e:expr,)*}) => {
-        static STEP: AtomicU8::new(0);
-        #[allow(dead_code)]
-        static VAL8: AtomicU8 = AtomicU8::new(0);
-        #[allow(dead_code)]
-        static VAL16: AtomicU16 = AtomicU16::new(0);
-        $(if STEP.load(Relaxed) == $c { $e })* else {
-            return $d;
-        }
-    };
-}
-pub(crate) use step;
-macro_rules! go {
-    ($e:expr) => {
-        STEP.store($e, Relaxed)
-    }
-}
+use crate::{
+    cpu::{go, step, Cpu},
+    operand::{IO16, IO8},
+    peripherals::Peripherals,
+};
+
+use std::sync::atomic::{
+    AtomicU8,
+    AtomicU16,
+    Ordering::Relaxed,
+};
+
 
 impl Cpu {
     // 何もしないという命令
@@ -28,7 +22,9 @@ impl Cpu {
     }
     // ldはsから読み込んでdに書き込む
     pub fn ld<D: Copy, S: Copy>(&mut self, bus: &mut Peripherals, dst: D, src: S)
-    where Self: IO8<D> + IOS<S> {
+    where
+        Self: IO8<D> + IO8<S>,
+    {
         step!((), {
             0: if let Some(v) = self.read8(bus, src) {
                 VAL8.store(v, Relaxed);
@@ -44,13 +40,15 @@ impl Cpu {
         });
     }
     pub fn ld16<D: Copy, S: Copy>(&mut self, bus: &mut Peripherals, dst: D, src: S)
-    where Self: IO16<D> + IO16<S> {
+    where
+        Self: IO16<D> + IO16<S>,
+    {
         step!((), {
             0: if let Some(v) = self.read16(bus, src) {
                 VAL16.store(v, Relaxed);
                 go!(1);
             },
-            1: if self.write16(bus, dst:, VAL16.load(Relaxed).is_some()) {
+            1: if self.write16(bus, dst, VAL16.load(Relaxed)).is_some() {
                 go!(2);
             },
             2: {
@@ -60,4 +58,3 @@ impl Cpu {
         });
     }
 }
-

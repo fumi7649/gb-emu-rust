@@ -1,5 +1,7 @@
 use std::sync::atomic::{AtomicU16, AtomicU8, Ordering::Relaxed};
 
+use crate::{cpu::{go, step, Cpu}, peripherals::Peripherals};
+
 pub trait IO8<T: Copy> {
     fn read8(&mut self, bus: &Peripherals, src: T) -> Option<u8>;
     fn write8(&mut self, bus: &mut Peripherals, dst: T, val: u8) -> Option<()>;
@@ -112,17 +114,17 @@ impl IO8<Imm8> for Cpu {
                 go!(0);
                 return Some(VAL8.load(Relaxed));
             },
-        })
+        });
     }
-    fn write8(&mut self, _: Imm8, _: u8) -> Option<()> {
-        unreachable!()
+    fn write8(&mut self, _: &mut Peripherals, _: Imm8, _: u8) -> Option<()>{
+        unreachable!();
     }
 }
 impl IO16<Imm16> for Cpu {
     fn read16(&mut self, bus: &Peripherals, _: Imm16) -> Option<u16> {
         step!(None, {
             0: if let Some(lo) = self.read8(bus, Imm8) {
-                VAL8.store(lo, Relaxed)
+                VAL8.store(lo, Relaxed);
                 go!(1);
             },
             1: if let Some(hi) = self.read8(bus, Imm8) {
@@ -134,9 +136,9 @@ impl IO16<Imm16> for Cpu {
                 return Some(VAL16.load(Relaxed));
             },
         });
-        fn write16(&mut self, _: &mut Peripherals, _: Imm16, _: u16) -> Option<()> {
-            unreachable!();
-        }
+    }
+    fn write16(&mut self, _: &mut Peripherals, _: Imm16, _: u16) -> Option<()> {
+        unreachable!();
     }
 }
 impl IO8<Indirect> for Cpu {
@@ -144,16 +146,16 @@ impl IO8<Indirect> for Cpu {
         step!(None, {
             0: {
                 VAL8.store(match src {
-                    Indirect::BC => bus.read(self.regs.BC()),
-                    Indirect::DF => bus.read(self.regs.DF()),
-                    Indirect::HL => bus.read(self.regs.HL()),
-                    Indirect::CFF => bus.read(0xFF00 | self.regs.c as u16),
-                    Indirect::HLD => {
+                    Indirect::BC=>bus.read(self.regs.bc()),
+                    Indirect::DE=>bus.read(self.regs.de()),
+                    Indirect::HL=>bus.read(self.regs.hl()),
+                    Indirect::CFF=>bus.read(0xFF00|self.regs.c as u16),
+                    Indirect::HLD=> {
                         let addr = self.regs.hl();
                         self.regs.write_hl(addr.wrapping_add(1));
-                        bus.read(addr);
+                        bus.read(addr)
                     },
-                }, Relaxed);
+                    Indirect::HLI => todo!(), }, Relaxed);
                 go!(1);
                 return None;
             },
@@ -167,9 +169,9 @@ impl IO8<Indirect> for Cpu {
         step!(None, {
             0: {
                 match dst {
-                    Indirect::BC => bus.write8(self.regs.bc(), val),
-                    Indirect::DE => bus.write8(self.regs.de(), val),
-                    Indirect::HL => bus.write8(self.regs.hl(), val),
+                    Indirect::BC => bus.write(self.regs.bc(), val),
+                    Indirect::DE => bus.write(self.regs.de(), val),
+                    Indirect::HL => bus.write(self.regs.hl(), val),
                     Indirect::CFF => bus.write(0xFF00 | (self.regs.c as u16), val),
                     Indirect::HLD => {
                         let addr = self.regs.hl();
@@ -180,15 +182,15 @@ impl IO8<Indirect> for Cpu {
                         let addr = self.regs.hl();
                         self.regs.write_hl(addr.wrapping_add(1));
                         bus.write(addr, val);
-                    },
-                    go!(1);
-                    return None;
+                    }
                 }
+                go!(1);
+                return None;
             },
             1: {
                 return Some(go!(0));
-            }
-        })
+            },
+        });
     }
 }
 impl IO8<Direct8> for Cpu {
@@ -207,14 +209,14 @@ impl IO8<Direct8> for Cpu {
                 go!(2);
             },
             2: {
-                VAL8.store(bus.read(VAL16.load(Relaxed), hi), Relaxed);
+                VAL8.store(bus.read(VAL16.load(Relaxed)), Relaxed);
                 go!(3);
                 return None;
             },
             3: {
                 go!(0);
                 return Some(VAL8.load(Relaxed));
-            }
+            },
         });
     }
     fn write8(&mut self, bus: &mut Peripherals, dst: Direct8, val: u8) -> Option<()> {
@@ -228,16 +230,16 @@ impl IO8<Direct8> for Cpu {
                 }
             },
             1: if let Some(hi) = self.read8(bus, Imm8) {
-                VAL16.store(u16:from_le_bytes([VAL8.load(Relaxed), hi]), Relaxed);
+                VAL16.store(u16::from_le_bytes([VAL8.load(Relaxed), hi]), Relaxed);
                 go!(2);
             },
             2: {
-                bus.write(VAL16.load(Relaxed, val));
+                bus.write(VAL16.load(Relaxed), val);
                 go!(3);
                 return None;
             },
-            3: return Some(go!(0));
-        })
+            3: return Some(go!(0)),
+        });
     }
 }
 //  メモリ8bitの読み書きで1マシンサイクルかかる
@@ -247,11 +249,11 @@ impl IO16<Direct16> for Cpu {
     }
     fn write16(&mut self, bus: &mut Peripherals, _: Direct16, val: u16) -> Option<()> {
         step!(None, {
-            0: if Some(lo) = self.read8(bus, Imm8) {
+            0: if let Some(lo) = self.read8(bus, Imm8) {
                 VAL8.store(lo, Relaxed);
                 go!(1);
             },
-            1: if Some(hi) = self.read8(bus, Imm8) {
+            1: if let Some(hi) = self.read8(bus, Imm8) {
                 VAL16.store(u16::from_le_bytes([VAL8.load(Relaxed), hi]), Relaxed);
                 go!(2);
             },
@@ -265,7 +267,7 @@ impl IO16<Direct16> for Cpu {
                 go!(4);
                 return None;
             },
-            4: return Some(go!(0));
-        })
+            4: return Some(go!(0)),
+        });
     }
 }
