@@ -146,4 +146,28 @@ impl Cpu {
             },
          });
     }
+    // RL sの値とCフラッグを合わせた9ビットの値を左に回転する
+    // Z演算結果が0の場合は1にする
+    // N　無条件で0にする
+    // H　無条件で0にする
+    // C 演算するまえのsの7bit目が1出会った場合は1にする
+    pub fn rl<S: Copy>(&mut self, bus: &mut Peripherals, src:S)
+    where Self: IO8<S> {
+        step!((), {
+            0: if let Some(v) = self.read8(bus, src) {
+                let result = (v << 1) | self.regs.cf() as u8;
+                self.regs.set_zf(result == 0);
+                self.regs.set_nf(false);
+                self.regs.set_hf(false);
+                self.regs.set_cf(v & 0x80 > 0); // 0x80 10000000
+                VAL8.store(result, Relaxed);
+                go!(1);
+            },
+            1: if self.write8(bus, src, VAL8.load(Relaxed)).is_some() {
+                go!(0);
+                self.fetch(bus);
+            },
+        });
+    }    
+
 }
